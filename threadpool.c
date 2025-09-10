@@ -1,4 +1,3 @@
-#include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
 #include <time.h>
@@ -64,29 +63,33 @@ void enqueue_task(ThreadpoolState *tps, TaskFunction function, void *userdata)
 	pthread_mutex_unlock(&tps->mutex);
 }
 
-Task dequeue_task(ThreadpoolState *tps)
-{
-	return tps->tasks[tps->tail++ & tps->mask];
-}
-
-int has_tasks(ThreadpoolState *tps)
+static int has_tasks(ThreadpoolState *tps)
 {
 	return tps->head != tps->tail;
+}
+
+bool dequeue_task(ThreadpoolState *tps, Task *out)
+{
+	pthread_mutex_lock(&tps->mutex);
+	if (!has_tasks(tps)) {
+		pthread_mutex_unlock(&tps->mutex);
+		return false;
+	}
+	*out = tps->tasks[tps->tail++ & tps->mask];
+	pthread_mutex_unlock(&tps->mutex);
+	return true;
 }
 
 void run_tasks_in_pool(ThreadpoolState *tps)
 {
 	int running_loaded;
 	do {
-		pthread_mutex_lock(&tps->mutex);
-
-		while (has_tasks(tps))
+		Task task;
+		while (dequeue_task(tps, &task))
 		{
-			Task task = dequeue_task(tps);
 			task.function(task.userdata);
 		}
 		
-		pthread_mutex_unlock(&tps->mutex);
 		__atomic_load(&tps->running, &running_loaded, __ATOMIC_RELAXED);
 		
 		sleep_ns(65536);
