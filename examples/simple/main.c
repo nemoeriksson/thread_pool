@@ -5,7 +5,7 @@
 
 #include <pthread.h>
 
-#include "threadpool.h"
+#include <threadpool.h>
 
 int thread_work_count = 10240;
 
